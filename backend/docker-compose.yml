@@ -33,6 +33,17 @@ services:
       start_period: 30s
     restart: unless-stopped
 
+  web:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    ports:
+      - "47220:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
   db:
     image: postgres:16-alpine
     environment:

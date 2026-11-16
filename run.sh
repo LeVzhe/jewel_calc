@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Полный подъем приложения. Сейчас это API и PostgreSQL.
-# Фронтенд добавится в этот же скрипт, когда появится папка frontend.
+# Полный подъем приложения: интерфейс, API и PostgreSQL.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

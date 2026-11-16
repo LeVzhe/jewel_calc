@@ -1,6 +1,6 @@
 # jewel_calc
 
-Домашний калькулятор бижутерии. Сейчас готов каталог комплектующих: API на FastAPI и PostgreSQL в Docker. Фронтенд будет отдельной папкой `frontend` и подключится к тому же `run.sh`.
+Домашний калькулятор бижутерии. Сейчас готов каталог комплектующих: интерфейс, API на FastAPI и PostgreSQL в Docker.
 
 Приложение для своих. Отдельной авторизации нет. Записи не удаляются физически: их архивируют и при необходимости возвращают.
 
@@ -10,7 +10,7 @@
 - PostgreSQL 16
 - Poetry и локальное виртуальное окружение `backend/.venv`
 - Картинки в Cloudflare R2, клиент `aioboto3`
-- Docker Compose: сервисы `api` и `db`
+- Docker Compose: сервисы `web`, `api` и `db`
 
 Слои API такие же, как в foodbox: `controllers` → `services` → `repositories` → `models`.
 
@@ -78,6 +78,7 @@ jewel_calc/components/<guid>/<guid>_preview.jpg
 bash run.sh
 ```
 
+Интерфейс: <http://localhost:47220>  
 API: <http://localhost:47221>  
 Документация: <http://localhost:47221/docs>  
 Проверка: <http://localhost:47221/health>  
@@ -94,6 +95,61 @@ bash run.sh down            # остановить, данные Postgres сох
 ```
 
 При старте контейнер сам выполняет `alembic upgrade head`. Процесс API внутри контейнера — `fastapi run`, без автоперезагрузки: после правки кода контейнер нужно перезапустить. Для перезагрузки на лету удобнее локальный `fastapi dev` из раздела ниже. Первый запуск собирает образ и ставит зависимости, нужен доступ в сеть.
+
+С телефона в той же Wi-Fi страница открывается отдельно, см. следующий раздел. Наружу выставляется только `47220`.
+
+## Телефон в той же Wi-Fi
+
+WSL2 живёт в своей сети и к Wi-Fi не подключён. Телефон доходит до беспроводного адреса Windows, а Windows уже передаёт порт внутрь WSL, где его слушает Docker. Роутер настраивать не нужно. Стек должен быть запущен (`bash run.sh`), и на самом компьютере <http://localhost:47220> уже открывается.
+
+Дальше всё в PowerShell **от имени администратора**.
+
+Служба, без которой `portproxy` молча ничего не слушает:
+
+```powershell
+Set-Service iphlpsvc -StartupType Automatic
+Start-Service iphlpsvc
+```
+
+Проброс порта сайта на текущий адрес WSL. Этот адрес меняется после перезагрузки Windows и после `wsl --shutdown`, поэтому блок можно запускать снова: старое правило сначала снимается.
+
+```powershell
+$wslIp = (wsl hostname -I).Trim().Split(" ")[0]
+netsh interface portproxy delete v4tov4 listenaddress=0.0.0.0 listenport=47220
+netsh interface portproxy add v4tov4 listenaddress=0.0.0.0 listenport=47220 connectaddress=$wslIp connectport=47220
+netsh interface portproxy show all
+```
+
+В `show all` у `47220` в колонке connect должен быть тот же адрес, что напечатан в `$wslIp`, обычно `172.x`.
+
+Разрешить вход только из частной сети, один раз:
+
+```powershell
+New-NetFirewallRule -DisplayName "jewel_calc web" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 47220 -Profile Private
+```
+
+Если правило с таким именем уже есть, команду пропускают. Профиль Wi-Fi должен быть частным:
+
+```powershell
+Get-NetConnectionProfile
+```
+
+У домашней сети в `NetworkCategory` нужно `Private`. Для своей сети это ставится так, подставив имя из вывода выше:
+
+```powershell
+Set-NetConnectionProfile -Name "Имя сети" -NetworkCategory Private
+```
+
+Адрес компьютера в Wi-Fi смотрят в `ipconfig`: блок беспроводного адаптера, строка IPv4. На телефоне, в той же сети и без мобильного интернета как единственного канала, открывают `http://этот-адрес:47220`. Страница сама ходит в `/api` на том же адресе, отдельный порт API не нужен. Снимки при этом качаются с Cloudflare, поэтому у телефона должен быть и выход в интернет.
+
+Порты `47221` и `47232` в Wi-Fi не пробрасываются: это API мимо интерфейса и Postgres с паролем из `.env`. Доступа по паролю у приложения нет, так что адрес страницы лучше не оставлять на гостевой сети. Если страница с телефона не открывается, а с компьютера открывается, у роутера часто включена изоляция клиентов: устройства в одной Wi-Fi не видят друг друга. Её выключают в настройках роутера.
+
+Убрать проброс:
+
+```powershell
+netsh interface portproxy delete v4tov4 listenaddress=0.0.0.0 listenport=47220
+Remove-NetFirewallRule -DisplayName "jewel_calc web"
+```
 
 ## Локальное окружение
 
