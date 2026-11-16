@@ -1,0 +1,30 @@
+[project]
+name = "jewel-calc-api"
+version = "0.1.0"
+description = "Home catalog of jewelry components"
+authors = [
+    {name = "LeVzhe"}
+]
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi[standard] (>=0.139.0,<0.140.0)",
+    "sqlalchemy[asyncio] (>=2.0.51,<3.0.0)",
+    "alembic (>=1.18.5,<2.0.0)",
+    "asyncpg (>=0.31.0,<0.32.0)",
+    "pydantic-settings (>=2.14.2,<3.0.0)",
+    "aioboto3 (>=15.5.0,<16.0.0)",
+    "pillow (>=12.3.0,<13.0.0)"
+]
+
+
+[tool.poetry]
+package-mode = false
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[dependency-groups]
+dev = [
+    "ruff (>=0.16.0,<0.17.0)"
+]
