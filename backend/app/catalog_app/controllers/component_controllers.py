@@ -8,7 +8,7 @@ from app.deps import ComponentQuery, DbSession
 class ComponentController:
     def __init__(self) -> None:
         self.router = APIRouter(prefix="/component", tags=["Component"])
-        self.router.add_api_route("/list", self.component_list, methods=["GET"], response_model=list[catalog_schemas.ComponentRead])
+        self.router.add_api_route("/list", self.component_list, methods=["GET"], response_model=catalog_schemas.ComponentList)
         self.router.add_api_route("/create", self.component_create, methods=["POST"], status_code=201, response_model=catalog_schemas.ComponentRead)
         self.router.add_api_route("/archive", self.component_archive, methods=["PATCH"], response_model=catalog_schemas.IdsResult)
         self.router.add_api_route("/unarchive", self.component_unarchive, methods=["PATCH"], response_model=catalog_schemas.IdsResult)

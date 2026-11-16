@@ -1,0 +1,16 @@
+---
+description: Стек jewel_calc запускается только в фоне
+alwaysApply: true
+---
+
+# Запуск в фоне
+
+Стек (интерфейс, API, PostgreSQL) поднимай из корня репозитория без флагов. Скрипт сам собирает образы и уходит в фон:
+
+```bash
+bash run.sh
+```
+
+Остановка: `bash run.sh down`. Данные Postgres при этом сохраняются.
+
+Сайт: http://localhost:47220. API: http://localhost:47221.

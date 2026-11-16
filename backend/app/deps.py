@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.catalog_app.schemas.common_schemas import ListParams
 from app.catalog_app.schemas.component_schemas import ComponentListParams
+from app.catalog_app.schemas.jewelry_schemas import JewelryListParams
 from utils.db_utils import DbManager
 
 
@@ -17,3 +18,4 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 DbSession = Annotated[AsyncSession, Depends(get_db)]
 CatalogListParams = Annotated[ListParams, Depends()]
 ComponentQuery = Annotated[ComponentListParams, Depends()]
+JewelryQuery = Annotated[JewelryListParams, Depends()]

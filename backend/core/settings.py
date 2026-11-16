@@ -12,7 +12,9 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    app_version: str = "0.1.0"
+    app_name: str = "Jewel calc"
+    app_version: str = "1.0.0"
+    app_author: str = "LeV"
 
     postgres_user: str = Field(min_length=1)
     postgres_password: str = Field(min_length=1)

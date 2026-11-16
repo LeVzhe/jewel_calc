@@ -37,7 +37,7 @@ class ComponentService:
             raise HTTPException(status_code=400, detail=f"Color {color_id} is archived")
 
     @classmethod
-    async def get_list(cls, db, params: ComponentListParams) -> list[ComponentRead]:
+    async def get_list(cls, db, params: ComponentListParams):
         return await ComponentRepository.get_list(db=db, params=params)
 
     @classmethod
@@ -82,9 +82,9 @@ class ComponentService:
     async def update(cls, db, component_id: int, data: ComponentUpdate) -> ComponentRead:
         current = await cls.get_by_id(db, component_id)
         fields = data.model_fields_set
-        if "type_id" in fields and data.type_id is not None:
+        if "type_id" in fields and data.type_id is not None and data.type_id != current.type_id:
             await cls._ensure_type(db, data.type_id)
-        if "color_id" in fields and data.color_id is not None:
+        if "color_id" in fields and data.color_id is not None and data.color_id != current.color_id:
             await cls._ensure_color(db, data.color_id)
 
         payload = data.model_dump(exclude_unset=True, exclude={"image_base64", "shops"})

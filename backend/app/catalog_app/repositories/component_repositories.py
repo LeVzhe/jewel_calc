@@ -1,11 +1,11 @@
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.catalog_app.models import Component, ComponentShop
+from app.catalog_app.models import Component, ComponentShop, ComponentType
 from app.catalog_app.schemas.common_schemas import IdSkip, IdsResult
-from app.catalog_app.schemas.component_schemas import ComponentListParams, ComponentRead
+from app.catalog_app.schemas.component_schemas import ComponentList, ComponentListParams, ComponentRead
 from utils.constants import ComponentUnit, SkipReason
 from utils.text import like_contains, utcnow
 
@@ -30,6 +30,13 @@ class ComponentRepository:
         return result.scalar_one_or_none()
 
     @classmethod
+    async def get_rows_by_ids(cls, db: AsyncSession, ids: list[int]) -> dict[int, Component]:
+        if not ids:
+            return {}
+        result = await db.execute(select(Component).where(Component.id.in_(ids)))
+        return {row.id: row for row in result.scalars().all()}
+
+    @classmethod
     async def get_by_id(cls, db: AsyncSession, component_id: int) -> ComponentRead | None:
         row = await cls._get_row(db, component_id)
         if row is None:
@@ -37,21 +44,38 @@ class ComponentRepository:
         return ComponentRead.model_validate(row)
 
     @classmethod
-    async def get_list(cls, db: AsyncSession, params: ComponentListParams) -> list[ComponentRead]:
-        stmt = select(Component).options(*_COMPONENT_LOAD).order_by(Component.name, Component.id)
+    def _filters(cls, params: ComponentListParams) -> list:
+        filters = []
         if not params.include_archived:
-            stmt = stmt.where(Component.is_archived.is_(False))
+            filters.append(Component.is_archived.is_(False))
         if params.type_id is not None:
-            stmt = stmt.where(Component.type_id == params.type_id)
-        if params.color_id is not None:
-            stmt = stmt.where(Component.color_id == params.color_id)
-        if params.search:
-            stmt = stmt.where(
-                Component.name_key.like(like_contains(params.search.casefold()), escape="\\")
+            filters.append(Component.type_id == params.type_id)
+        if params.root_id is not None:
+            family = select(ComponentType.id).where(
+                or_(ComponentType.id == params.root_id, ComponentType.parent_id == params.root_id)
             )
-        stmt = stmt.offset(params.skip).limit(params.limit)
+            filters.append(Component.type_id.in_(family))
+        if params.color_id is not None:
+            filters.append(Component.color_id == params.color_id)
+        if params.search:
+            filters.append(Component.name_key.like(like_contains(params.search.casefold()), escape="\\"))
+        return filters
+
+    @classmethod
+    async def get_list(cls, db: AsyncSession, params: ComponentListParams) -> ComponentList:
+        filters = cls._filters(params)
+        total = await db.scalar(select(func.count()).select_from(Component).where(*filters))
+        stmt = (
+            select(Component)
+            .options(*_COMPONENT_LOAD)
+            .where(*filters)
+            .order_by(Component.name, Component.id)
+            .offset(params.skip)
+            .limit(params.limit)
+        )
         result = await db.execute(stmt)
-        return [ComponentRead.model_validate(row) for row in result.scalars().all()]
+        items = [ComponentRead.model_validate(row) for row in result.scalars().all()]
+        return ComponentList(items=items, total=int(total or 0))
 
     @classmethod
     async def create(cls, db: AsyncSession, data: dict) -> ComponentRead:
@@ -154,9 +178,6 @@ class ComponentRepository:
             else:
                 if not row.is_archived:
                     skipped.append(IdSkip(id=item_id, reason=SkipReason.ALREADY_ACTIVE))
-                    continue
-                if row.component_type.is_archived:
-                    skipped.append(IdSkip(id=item_id, reason=SkipReason.TYPE_ARCHIVED))
                     continue
                 taken = await db.execute(
                     select(Component.id).where(

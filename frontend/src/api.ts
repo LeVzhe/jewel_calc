@@ -1,4 +1,4 @@
-import type { Color, Component, ComponentType, IdsResult, Unit } from "./types";
+import type { Color, Component, ComponentType, IdsResult, Jewelry, Unit } from "./types";
 
 async function readError(response: Response): Promise<string> {
   try {
@@ -26,6 +26,17 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (await response.json()) as T;
 }
 
+export type AppMeta = {
+  name: string;
+  version: string;
+  year: number;
+  author: string;
+};
+
+export function getMeta() {
+  return request<AppMeta>("/meta");
+}
+
 export function listTypes(includeArchived: boolean) {
   const query = new URLSearchParams({ limit: "200" });
   if (includeArchived) query.set("include_archived", "true");
@@ -38,11 +49,25 @@ export function listColors(includeArchived: boolean) {
   return request<Color[]>(`/color/list?${query}`);
 }
 
-export function listComponents(search: string, includeArchived: boolean) {
-  const query = new URLSearchParams({ limit: "200" });
+export type Page<T> = {
+  items: T[];
+  total: number;
+};
+
+export function listComponents(
+  search: string,
+  includeArchived: boolean,
+  options?: { skip?: number; limit?: number; rootId?: number | null; colorId?: number | null },
+) {
+  const query = new URLSearchParams({
+    limit: String(options?.limit ?? 200),
+    skip: String(options?.skip ?? 0),
+  });
   if (search.trim()) query.set("search", search.trim());
   if (includeArchived) query.set("include_archived", "true");
-  return request<Component[]>(`/component/list?${query}`);
+  if (options?.rootId) query.set("root_id", String(options.rootId));
+  if (options?.colorId) query.set("color_id", String(options.colorId));
+  return request<Page<Component>>(`/component/list?${query}`);
 }
 
 export type ComponentPayload = {
@@ -108,4 +133,51 @@ export function archiveColors(ids: number[]) {
 
 export function unarchiveColors(ids: number[]) {
   return request<IdsResult>("/color/unarchive", { method: "PATCH", body: JSON.stringify({ ids }) });
+}
+
+export function listJewelry(search: string, includeArchived: boolean, skip = 0, limit = 200) {
+  const query = new URLSearchParams({ limit: String(limit), skip: String(skip) });
+  if (search.trim()) query.set("search", search.trim());
+  if (includeArchived) query.set("include_archived", "true");
+  return request<Page<Jewelry>>(`/jewelry/list?${query}`);
+}
+
+export type JewelryPartPayload = {
+  component_id: number;
+  quantity: number;
+};
+
+export type JewelryPhotoPayload = {
+  id?: number;
+  image_base64?: string;
+};
+
+export type JewelryPayload = {
+  name: string;
+  parts: JewelryPartPayload[];
+  photos: string[];
+  sale_price: number;
+};
+
+export type JewelryUpdatePayload = {
+  name?: string;
+  parts?: JewelryPartPayload[];
+  photos?: JewelryPhotoPayload[];
+  sale_price?: number;
+};
+
+export function createJewelry(body: JewelryPayload) {
+  return request<Jewelry>("/jewelry/create", { method: "POST", body: JSON.stringify(body) });
+}
+
+export function updateJewelry(id: number, body: JewelryUpdatePayload) {
+  return request<Jewelry>(`/jewelry/${id}`, { method: "PATCH", body: JSON.stringify(body) });
+}
+
+export function archiveJewelry(ids: number[]) {
+  return request<IdsResult>("/jewelry/archive", { method: "PATCH", body: JSON.stringify({ ids }) });
+}
+
+export function unarchiveJewelry(ids: number[]) {
+  return request<IdsResult>("/jewelry/unarchive", { method: "PATCH", body: JSON.stringify({ ids }) });
 }

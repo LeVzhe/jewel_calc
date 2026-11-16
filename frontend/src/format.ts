@@ -14,6 +14,21 @@ export function money(value: number): string {
   return new Intl.NumberFormat("ru-RU", { style: "currency", currency: "RUB" }).format(value);
 }
 
+export function roundMoney(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+export function salePrice(cost: number, markupPercent: number): number {
+  return roundMoney(cost * (1 + markupPercent / 100));
+}
+
+export function markupFromSale(cost: number, sale: number): number {
+  if (!(cost > 0) || !Number.isFinite(sale)) return 30;
+  const percent = (sale / cost - 1) * 100;
+  if (!Number.isFinite(percent)) return 30;
+  return Math.round(Math.min(300, Math.max(0, percent)));
+}
+
 export function skipMessage(result: IdsResult): string | null {
   if (result.skipped.length === 0) return null;
   const text = result.skipped.map((item) => SKIP_REASON[item.reason] ?? item.reason).join(". ");

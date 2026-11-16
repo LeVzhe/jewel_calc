@@ -60,6 +60,7 @@ def _clean_name(value: str) -> str:
 
 class ComponentListParams(ListParams):
     type_id: int | None = Field(default=None, ge=1)
+    root_id: int | None = Field(default=None, ge=1)
     color_id: int | None = Field(default=None, ge=1)
     search: str | None = Field(default=None, max_length=255)
 
@@ -215,3 +216,8 @@ class ComponentUpdate(pydantic.BaseModel):
         if not cleaned:
             raise ValueError("image_base64 is empty")
         return cleaned
+
+
+class ComponentList(pydantic.BaseModel):
+    items: list[ComponentRead]
+    total: int

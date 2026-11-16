@@ -11,6 +11,7 @@ class ComponentUnit(StrEnum):
 
 class R2Folders(StrEnum):
     COMPONENT = "jewel_calc/components"
+    JEWELRY = "jewel_calc/jewelry"
 
 
 class SkipReason(StrEnum):

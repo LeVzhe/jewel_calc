@@ -2,7 +2,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.catalog_app.models import Component, ComponentType
+from app.catalog_app.models import ComponentType
 from app.catalog_app.schemas.common_schemas import IdSkip, IdsResult, ListParams
 from app.catalog_app.schemas.component_type_schemas import ComponentTypeRead
 from utils.constants import SkipReason
@@ -63,18 +63,6 @@ class ComponentTypeRepository:
         unique_ids = list(dict.fromkeys(ids))
         result = await db.execute(select(ComponentType).where(ComponentType.id.in_(unique_ids)))
         rows = {row.id: row for row in result.scalars().all()}
-        used_ids: set[int] = set()
-        if archived and unique_ids:
-            count_result = await db.execute(
-                select(Component.type_id)
-                .where(
-                    Component.type_id.in_(unique_ids),
-                    Component.is_archived.is_(False),
-                )
-                .distinct()
-            )
-            used_ids = set(count_result.scalars().all())
-
         changed: list[int] = []
         skipped: list[IdSkip] = []
         for item_id in unique_ids:
@@ -88,9 +76,6 @@ class ComponentTypeRepository:
                     continue
                 if row.is_archived:
                     skipped.append(IdSkip(id=item_id, reason=SkipReason.ALREADY_ARCHIVED))
-                    continue
-                if row.id in used_ids:
-                    skipped.append(IdSkip(id=item_id, reason=SkipReason.USED_BY_COMPONENTS))
                     continue
                 row.is_archived = True
             else:

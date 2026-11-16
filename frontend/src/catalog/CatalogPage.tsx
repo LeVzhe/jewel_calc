@@ -1,21 +1,26 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { listColors, listComponents, listTypes } from "../api";
 import { money } from "../format";
 import type { Color, Component, ComponentType } from "../types";
+import { PAGE_SIZE, Pager, usePageReset } from "../shelf/Pager";
+import { useShelfView, ViewSwitch } from "../shelf/ShelfView";
 import { ComponentForm } from "./ComponentForm";
 
 export function CatalogPage() {
   const [types, setTypes] = useState<ComponentType[]>([]);
   const [colors, setColors] = useState<Color[]>([]);
   const [items, setItems] = useState<Component[]>([]);
+  const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
   const [rootId, setRootId] = useState<number | null>(null);
   const [colorId, setColorId] = useState<number | null>(null);
   const [showArchived, setShowArchived] = useState(false);
+  const [page, setPage] = usePageReset(`${query}|${showArchived}|${rootId ?? ""}|${colorId ?? ""}`);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editor, setEditor] = useState<Component | null | undefined>(undefined);
+  const [shelf, setShelf] = useShelfView();
 
   useEffect(() => {
     const timer = window.setTimeout(() => setQuery(search), 300);
@@ -24,11 +29,26 @@ export function CatalogPage() {
 
   function reload() {
     setLoading(true);
-    Promise.all([listTypes(true), listColors(true), listComponents(query, showArchived)])
-      .then(([nextTypes, nextColors, nextItems]) => {
+    Promise.all([
+      listTypes(true),
+      listColors(true),
+      listComponents(query, showArchived, {
+        skip: (page - 1) * PAGE_SIZE,
+        limit: PAGE_SIZE,
+        rootId,
+        colorId,
+      }),
+    ])
+      .then(([nextTypes, nextColors, nextPage]) => {
+        const last = Math.max(1, Math.ceil(nextPage.total / PAGE_SIZE));
+        if (page > last) {
+          setPage(last);
+          return;
+        }
         setTypes(nextTypes);
         setColors(nextColors);
-        setItems(nextItems);
+        setItems(nextPage.items);
+        setTotal(nextPage.total);
         setError(null);
       })
       .catch((cause: unknown) => {
@@ -41,16 +61,9 @@ export function CatalogPage() {
     reload();
     // reload is recreated each render; the inputs below are the real triggers.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, showArchived]);
+  }, [query, showArchived, rootId, colorId, page]);
 
   const roots = types.filter((item) => item.parent_id === null && !item.is_archived);
-  const visible = useMemo(() => {
-    return items.filter((item) => {
-      const rootOk = rootId === null || item.type.id === rootId || item.type.parent_id === rootId;
-      const colorOk = colorId === null || item.color_id === colorId;
-      return rootOk && colorOk;
-    });
-  }, [items, rootId, colorId]);
 
   return (
     <section className="page">
@@ -111,12 +124,13 @@ export function CatalogPage() {
           />
           Архив
         </label>
+        <ViewSwitch view={shelf} onChange={setShelf} />
       </div>
 
       {error ? <p className="banner">{error}</p> : null}
       {loading ? <p className="muted">Собираю полку…</p> : null}
 
-      {!loading && visible.length === 0 ? (
+      {!loading && items.length === 0 ? (
         <div className="empty">
           <p>На полке пока пусто.</p>
           <button type="button" className="ghost" onClick={() => setEditor(null)}>
@@ -125,8 +139,8 @@ export function CatalogPage() {
         </div>
       ) : null}
 
-      <ul className="grid">
-        {visible.map((item) => (
+      <ul className={`shelf shelf-${shelf}`}>
+        {items.map((item) => (
           <li key={item.id}>
             <button type="button" className={item.is_archived ? "card is-archived" : "card"} onClick={() => setEditor(item)}>
               <img src={item.image_preview || item.image} alt="" />
@@ -149,6 +163,8 @@ export function CatalogPage() {
           </li>
         ))}
       </ul>
+
+      <Pager page={page} total={total} onPage={setPage} />
 
       {editor !== undefined ? (
         <ComponentForm

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Полный подъем приложения: интерфейс, API и PostgreSQL.
+# Полный подъем приложения в фоне: интерфейс, API и PostgreSQL.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -11,7 +11,10 @@ if [[ ! -f .env ]]; then
 fi
 
 if [[ $# -eq 0 ]]; then
-  docker compose up --build
+  docker compose up --build -d
+  # Висячие образы и кэш сборки. Тома, в том числе база, не удаляются.
+  docker image prune -f
+  docker builder prune -f
 else
   docker compose "$@"
 fi

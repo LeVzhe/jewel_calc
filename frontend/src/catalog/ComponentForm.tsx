@@ -6,6 +6,7 @@ import {
   updateComponent,
   type ComponentPayload,
 } from "../api";
+import { readImageFile } from "../files";
 import { skipMessage } from "../format";
 import type { Color, Component, ComponentType, Unit } from "../types";
 import { UNITS } from "../types";
@@ -18,18 +19,9 @@ type Props = {
   onSaved: () => void;
 };
 
-function fileToDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(reader.error ?? new Error("Не удалось прочитать файл"));
-    reader.readAsDataURL(file);
-  });
-}
-
 export function ComponentForm({ types, colors, initial, onClose, onSaved }: Props) {
-  const activeTypes = types.filter((item) => !item.is_archived);
-  const activeColors = colors.filter((item) => !item.is_archived);
+  const activeTypes = types.filter((item) => !item.is_archived || item.id === initial?.type_id);
+  const activeColors = colors.filter((item) => !item.is_archived || item.id === initial?.color_id);
   const roots = activeTypes.filter((item) => item.parent_id === null);
 
   const [name, setName] = useState(initial?.name ?? "");
@@ -66,18 +58,14 @@ export function ComponentForm({ types, colors, initial, onClose, onSaved }: Prop
 
   async function onFile(file: File | undefined) {
     if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      setError("Нужен файл картинки.");
-      return;
+    try {
+      const data = await readImageFile(file);
+      setImageData(data);
+      setPreview(data);
+      setError(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Не удалось прочитать файл");
     }
-    if (file.size > 10 * 1024 * 1024) {
-      setError("Файл больше 10 МБ.");
-      return;
-    }
-    const data = await fileToDataUrl(file);
-    setImageData(data);
-    setPreview(data);
-    setError(null);
   }
 
   async function onSubmit(event: FormEvent) {
@@ -155,14 +143,34 @@ export function ComponentForm({ types, colors, initial, onClose, onSaved }: Prop
           </button>
         </div>
 
-        <label className="photo-picker">
+        <div className="photo-picker">
           {preview ? <img src={preview} alt="" /> : <span>Фото ляжет в квадрат с белым полем</span>}
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(event) => void onFile(event.target.files?.[0])}
-          />
-        </label>
+          <div className="photo-actions">
+            <label className="ghost">
+              Снять
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={(event) => {
+                  void onFile(event.target.files?.[0]);
+                  event.target.value = "";
+                }}
+              />
+            </label>
+            <label className="ghost">
+              Файл
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(event) => {
+                  void onFile(event.target.files?.[0]);
+                  event.target.value = "";
+                }}
+              />
+            </label>
+          </div>
+        </div>
 
         <label>
           Название
@@ -202,7 +210,7 @@ export function ComponentForm({ types, colors, initial, onClose, onSaved }: Prop
                   .filter((item) => item.parent_id === root.id)
                   .map((item) => (
                     <option key={item.id} value={item.id}>
-                      {item.name}
+                      {item.is_archived ? `${item.name} · архив` : item.name}
                     </option>
                   ))}
               </optgroup>
@@ -219,7 +227,7 @@ export function ComponentForm({ types, colors, initial, onClose, onSaved }: Prop
             <option value="">Смотреть по фото</option>
             {activeColors.map((item) => (
               <option key={item.id} value={item.id}>
-                {item.name}
+                {item.is_archived ? `${item.name} · архив` : item.name}
               </option>
             ))}
           </select>
@@ -247,7 +255,7 @@ export function ComponentForm({ types, colors, initial, onClose, onSaved }: Prop
             />
           </label>
           <button type="button" className="ghost" onClick={addShop}>
-            Добавить
+            Добавить магазин
           </button>
           <ul>
             {shops.map((shop) => (

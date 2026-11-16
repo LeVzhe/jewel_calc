@@ -1,5 +1,6 @@
 import logging
 from contextlib import asynccontextmanager
+from datetime import datetime
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -25,7 +26,7 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(
     title="Jewel Calc",
     version=settings.app_version,
-    summary="Каталог комплектующих для домашнего калькулятора бижутерии",
+    summary="Каталог комплектующих и готовых изделий для домашнего калькулятора",
     lifespan=lifespan,
 )
 
@@ -41,6 +42,7 @@ for controller in (
     catalog_controllers.ComponentTypeController(),
     catalog_controllers.ColorController(),
     catalog_controllers.ComponentController(),
+    catalog_controllers.JewelryController(),
 ):
     app.include_router(controller.router)
 
@@ -52,7 +54,12 @@ async def root():
 
 @app.get("/meta", tags=["Meta"])
 async def get_meta():
-    return {"app_version": settings.app_version}
+    return {
+        "name": settings.app_name,
+        "version": settings.app_version,
+        "year": datetime.now().year,
+        "author": settings.app_author,
+    }
 
 
 @app.get("/health", tags=["Meta"])
